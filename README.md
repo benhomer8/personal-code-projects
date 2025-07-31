@@ -1,32 +1,36 @@
-# AWS Rekognition Demo with DeepFashion2 Dataset
+# Fashion Image Recognition using Amazon Rekognition and the DeepFashion2 Dataset
 
-AWS Rekognition demo for clothing classification using the DeepFashion2 dataset. This project provides tools to convert DeepFashion2 annotations into AWS Rekognition Custom Labels format for training custom clothing detection models.
+AWS Rekognition demo for fashion clothing recognition using the DeepFashion2 dataset. This demo focuses on using the DeepFashion2 dataset to train an AWS Rekognition model to identify clothing pieces on images.
 
-## Overview
+It uses two Python scripts: one to translate the DeepFashion2 annotations to COCO (Common Objects in Context) format, and another that transforms this file into a manifest file that is used by AWS Rekognition to label images.
 
-This demo focuses on using the DeepFashion2 dataset, a complex clothing classification dataset, to train an AWS Rekognition model to identify clothing pieces in images. The project includes:
+**Note**: It's the user's responsibility to create the S3 bucket to store the images and manifest file created by the scripts, and create the model on AWS Rekognition using the manifest file created by the scripts.
 
-- Python scripts to convert DeepFashion2 annotations to COCO format
-- Tools to transform COCO annotations into AWS Rekognition manifest files
-- Complete workflow for training custom clothing detection models
+## How to Use
 
-## Project Structure
+To use the model we need an S3 bucket setup with all the images, then follow the building order using the Python scripts. After that, upload the manifest file to S3, then use it to create the AWS Rekognition Custom Label dataset, then start the model training using it.
+
+**Important**: The images used should be in an S3 bucket.
+
+## S3 Bucket Setup
+
+1. **Create an S3 bucket**
+2. **Upload all images to S3** using the path `images/`
+
+For convenience, we recommend this schema for the bucket:
 
 ```
-rekognition-demo/
-├── README.md
-├── requirements.txt
-├── config.py
-├── coco_to_manifest.py      # Convert DeepFashion2 to COCO format
-├── manifest_generator.py    # Convert COCO to AWS Rekognition manifest
-├── utils/
-│   ├── __init__.py
-│   ├── deepfashion_parser.py
-│   └── s3_utils.py
-├── examples/
-│   └── sample_images/
-└── docs/
-    └── s3_schema.md
+s3://your-rekognition-bucket/
+├── images/                 # All training images
+│   ├── 000001.jpg
+│   ├── 000002.jpg
+│   └── ...
+├── annotations/           # Annotation files (optional)
+│   ├── deepfashion2_coco.json
+│   └── rekognition_manifest.json
+└── manifests/            # Final manifest files
+    ├── train_manifest.json
+    └── test_manifest.json
 ```
 
 ## Prerequisites
@@ -35,120 +39,105 @@ rekognition-demo/
 - AWS CLI configured with appropriate permissions
 - S3 bucket for storing images and manifest files
 - AWS Rekognition Custom Labels access
+- DeepFashion2 dataset
 
 ## Installation
 
-1. Clone or create this repository
+1. Clone this repository
 2. Install required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-
-## S3 Setup
-
-1. **Create an S3 bucket** for your project
-2. **Upload images** to the S3 bucket using the path structure:
+3. Configure your AWS credentials:
+   ```bash
+   aws configure
    ```
-   your-bucket-name/
-   └── images/
-       ├── image1.jpg
-       ├── image2.jpg
-       └── ...
-   ```
-
-### Recommended S3 Schema
-
-```
-s3://your-rekognition-bucket/
-├── images/                 # All training images
-│   ├── train/
-│   │   ├── tops/
-│   │   ├── bottoms/
-│   │   ├── dresses/
-│   │   └── accessories/
-│   └── validation/
-│       ├── tops/
-│       ├── bottoms/
-│       ├── dresses/
-│       └── accessories/
-├── annotations/           # Annotation files
-│   ├── deepfashion2_coco.json
-│   └── rekognition_manifest.json
-└── manifests/            # Final manifest files
-    ├── training.manifest
-    └── validation.manifest
-```
 
 ## Configuration
 
-1. Update the S3 bucket name in `config.py`:
-   ```python
-   S3_BUCKET_NAME = "your-rekognition-bucket"
-   ```
+Update the S3 bucket name in `coco_to_manifest.py`:
 
-## Usage
+```python
+S3_BUCKET_NAME = "your-rekognition-bucket"
+```
+
+## Build
 
 ### Step 1: Convert DeepFashion2 to COCO Format
 
-```bash
-python coco_to_manifest.py
-```
-
-This script will:
-- Parse DeepFashion2 annotations
-- Convert them to COCO format
-- Save the COCO JSON file locally
-
-### Step 2: Generate AWS Rekognition Manifest
+Run to create the COCO file:
 
 ```bash
-python manifest_generator.py
+python deepfashion2_to_coco.py --data_dir /path/to/deepfashion2/validation --output deepfashion2_coco.json
 ```
 
-This script will:
-- Read the COCO format annotations
-- Convert them to AWS Rekognition manifest format
-- Upload the manifest file to your S3 bucket
+### Step 2: Convert COCO to Manifest and Upload to S3
 
-### Step 3: Train AWS Rekognition Model
+Run to create the manifest file and upload to S3:
 
-1. **Create a Custom Labels Project** in AWS Rekognition Console
-2. **Create a Dataset** using the uploaded manifest file
-3. **Start Training** the model
-4. **Start the Model** once training is complete
-5. **Test the Model** with new images
+```bash
+python coco_to_manifest.py --coco_file deepfashion2_coco.json --s3_bucket your-rekognition-bucket --upload_images
+```
 
-## Clothing Categories
+## Train
 
-The DeepFashion2 dataset includes the following clothing categories:
+1. **Create an AWS Rekognition Custom Label Model** using the uploaded manifest file
+2. **Start model training**
 
-- **Tops**: shirts, t-shirts, blouses, sweaters
-- **Bottoms**: pants, jeans, skirts, shorts
-- **Dresses**: all types of dresses
-- **Accessories**: bags, shoes, hats, jewelry
+### Training Steps:
+
+1. Go to AWS Rekognition Custom Labels console
+2. Create a new project
+3. Import dataset using "Import images labeled by SageMaker Ground Truth" option
+4. Provide the S3 URI of the training manifest file
+5. Start training the model
+6. Once training is complete, start the model for inference
+
+## DeepFashion2 Dataset Categories
+
+The dataset includes 13 clothing categories:
+
+- **short_sleeved_shirt**
+- **long_sleeved_shirt** 
+- **short_sleeved_outwear**
+- **long_sleeved_outwear**
+- **vest**
+- **sling** (consolidated with vest)
+- **shorts**
+- **trousers**
+- **skirt**
+- **short_sleeved_dress**
+- **long_sleeved_dress**
+- **vest_dress**
+- **sling_dress** (consolidated with vest_dress)
+
+## Results
+
+The trained model can achieve up to **85% overall accuracy**, with some clothing types reaching over **90% accuracy**. Training typically takes 24-48 hours depending on dataset size.
 
 ## File Descriptions
 
-- **`coco_to_manifest.py`**: Converts DeepFashion2 annotations to COCO format
-- **`manifest_generator.py`**: Converts COCO format to AWS Rekognition manifest
+- **`deepfashion2_to_coco.py`**: Converts DeepFashion2 annotations to COCO format
+- **`coco_to_manifest.py`**: Converts COCO format to AWS Rekognition manifest and uploads to S3
 - **`config.py`**: Configuration settings for S3 bucket and other parameters
-- **`utils/deepfashion_parser.py`**: Utilities for parsing DeepFashion2 dataset
-- **`utils/s3_utils.py`**: Helper functions for S3 operations
+- **`requirements.txt`**: Python dependencies
 
 ## AWS Costs
 
 Be aware of AWS costs:
 - **S3 Storage**: ~$0.023 per GB/month
 - **Rekognition Training**: ~$1.00 per hour of training
-- **Rekognition Inference**: ~$0.40 per hour when model is running
+- **Rekognition Inference**: ~$4.00 per hour when model is running
 - **Data Transfer**: Various rates for upload/download
+
+**Important**: Remember to stop your Custom Labels model when not in use to avoid inference charges.
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **S3 Permissions**: Ensure your AWS credentials have S3 read/write permissions
-2. **Image Formats**: AWS Rekognition supports JPEG and PNG formats
+2. **Image Formats**: AWS Rekognition supports JPEG and PNG formats only
 3. **File Size Limits**: Maximum image size is 15MB
 4. **Manifest Format**: Ensure JSON manifest follows AWS Rekognition specification
 
@@ -158,19 +147,13 @@ Be aware of AWS costs:
 - `BucketNotFound`: Verify S3 bucket name and region
 - `InvalidManifest`: Check JSON format and required fields
 
-## Contributing
+## About This Implementation
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is based on the TrackIt Fashion Catalog AWS Rekognition Demo, which demonstrates an end-to-end workflow for fashion image recognition using AWS services and the DeepFashion2 dataset.
 
 ## Resources
 
 - [AWS Rekognition Custom Labels Documentation](https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/)
 - [DeepFashion2 Dataset](https://github.com/switchablenorms/DeepFashion2)
 - [COCO Format Specification](https://cocodataset.org/#format-data)
+- [TrackIt Blog Post](https://trackit.io/image-recognition-amazon-rekognition-deepfashion2/)
